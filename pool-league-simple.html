@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool League Scheduler - Simple & Working</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 { color: #333; }
+        
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .team-card {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .team-name { font-weight: bold; color: #333; }
+        .team-info { font-size: 0.9em; color: #666; }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        
+        .schedule-week {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .week-header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+        
+        .match {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .match:last-child { border-bottom: none; }
+        .match-teams { flex: 1; }
+        .home-team { font-weight: bold; color: #28a745; }
+        .away-team { color: #dc3545; }
+        
+        .table-info {
+            font-size: 0.8em;
+            color: #666;
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        
+        .stats {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 0.9em; color: #666; }
+        
+        .highlight {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pool League Scheduler - Simple & Working</h1>
+        <div class="highlight">
+            <strong>🎯 Goal:</strong> Generate exactly <strong>18 weeks</strong> for 10 teams with <strong>5 matches per week</strong> (90 total matches).
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Teams</h2>
+        <div id="teams-display" class="teams-grid"></div>
+        
+        <button onclick="generateSchedule()" id="generateBtn">Generate 18-Week Schedule</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="container" id="results-container" style="display: none;">
+        <h2>Schedule Results</h2>
+        <div id="validation-results"></div>
+        <div id="schedule-display"></div>
+    </div>
+
+    <script>
+        const teams = [
+            { teamID: 9, name: "BFTC", tableID: 1 },
+            { teamID: 16, name: "Pin Ups", tableID: 1 },
+            { teamID: 1, name: "Black Sheep", tableID: 2 },
+            { teamID: 17, name: "Misfits", tableID: 2 },
+            { teamID: 7, name: "Red Lion A", tableID: 6 },
+            { teamID: 21, name: "Red Lion B", tableID: 6 },
+            { teamID: 19, name: "Riff Raff", tableID: 5 },
+            { teamID: 2, name: "Pussy", tableID: 7 },
+            { teamID: 20, name: "3 Gees", tableID: 8 },
+            { teamID: 18, name: "Gizmos", tableID: 8 }
+        ];
+
+        function generateSchedule() {
+            // Create all possible matches (90 total for 10 teams)
+            const allMatches = [];
+            for (let i = 0; i < teams.length; i++) {
+                for (let j = 0; j < teams.length; j++) {
+                    if (i !== j) {
+                        allMatches.push({
+                            homeTeam: teams[i],
+                            awayTeam: teams[j]
+                        });
+                    }
+                }
+            }
+
+            console.log(`Total matches to schedule: ${allMatches.length}`);
+
+            // Simple scheduling: 5 matches per week for 18 weeks
+            const schedule = [];
+            let matchIndex = 0;
+
+            for (let week = 1; week <= 18; week++) {
+                const weekMatches = [];
+                const usedTeams = new Set();
+
+                // Try to get 5 matches for this week
+                let attempts = 0;
+                while (weekMatches.length < 5 && matchIndex < allMatches.length && attempts < 100) {
+                    const match = allMatches[matchIndex];
+                    
+                    // Check if both teams are available this week
+                    if (!usedTeams.has(match.homeTeam.teamID) && !usedTeams.has(match.awayTeam.teamID)) {
+                        // Check table constraint
+                        const wouldViolateTableConstraint = weekMatches.some(existingMatch => 
+                            existingMatch.homeTeam.tableID === match.homeTeam.tableID
+                        );
+
+                        if (!wouldViolateTableConstraint) {
+                            weekMatches.push(match);
+                            usedTeams.add(match.homeTeam.teamID);
+                            usedTeams.add(match.awayTeam.teamID);
+                            allMatches.splice(matchIndex, 1); // Remove this match
+                        } else {
+                            matchIndex++;
+                        }
+                    } else {
+                        matchIndex++;
+                    }
+                    
+                    attempts++;
+                    if (matchIndex >= allMatches.length) matchIndex = 0; // Loop back
+                }
+
+                schedule.push({
+                    week: week,
+                    matches: weekMatches
+                });
+
+                console.log(`Week ${week}: ${weekMatches.length} matches, ${allMatches.length} remaining`);
+                
+                // Reset index for next week
+                matchIndex = 0;
+            }
+
+            displayResults(schedule);
+            return schedule;
+        }
+
+        function displayResults(schedule) {
+            const container = document.getElementById('results-container');
+            const validationDiv = document.getElementById('validation-results');
+            const scheduleDiv = document.getElementById('schedule-display');
+
+            // Calculate stats
+            const totalMatches = schedule.reduce((sum, week) => sum + week.matches.length, 0);
+            const matchesPerWeek = schedule.map(week => week.matches.length);
+            
+            // Validation
+            let isValid = true;
+            let errors = [];
+            
+            if (totalMatches !== 90) {
+                isValid = false;
+                errors.push(`Total matches: ${totalMatches}, Expected: 90`);
+            }
+
+            // Check table constraints
+            schedule.forEach(week => {
+                const homeTablesThisWeek = {};
+                week.matches.forEach(match => {
+                    const tableID = match.homeTeam.tableID;
+                    homeTablesThisWeek[tableID] = (homeTablesThisWeek[tableID] || 0) + 1;
+                });
+                
+                Object.keys(homeTablesThisWeek).forEach(tableID => {
+                    if (homeTablesThisWeek[tableID] > 1) {
+                        isValid = false;
+                        errors.push(`Week ${week.week}: Table ${tableID} has ${homeTablesThisWeek[tableID]} home teams`);
+                    }
+                });
+            });
+
+            // Display validation
+            validationDiv.innerHTML = `
+                <div class="${isValid ? 'success' : 'error'}">
+                    ${isValid ? '✓ Schedule is valid!' : '✗ Schedule has errors'}
+                </div>
+                ${errors.map(error => `<div class="error">${error}</div>`).join('')}
+                <div class="stats">
+                    <h3>Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">${schedule.length}</div>
+                            <div class="stat-label">Total Weeks</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${totalMatches}</div>
+                            <div class="stat-label">Total Matches</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${(totalMatches / schedule.length).toFixed(1)}</div>
+                            <div class="stat-label">Avg per Week</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${Math.min(...matchesPerWeek)}-${Math.max(...matchesPerWeek)}</div>
+                            <div class="stat-label">Min-Max per Week</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Display schedule
+            scheduleDiv.innerHTML = schedule.map(week => `
+                <div class="schedule-week">
+                    <div class="week-header">Week ${week.week} (${week.matches.length} matches)</div>
+                    ${week.matches.map(match => `
+                        <div class="match">
+                            <div class="match-teams">
+                                <span class="home-team">${match.homeTeam.name}</span>
+                                <span class="table-info">Table ${match.homeTeam.tableID}</span>
+                                vs
+                                <span class="away-team">${match.awayTeam.name}</span>
+                                <span class="table-info">Table ${match.awayTeam.tableID}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+
+            container.style.display = 'block';
+        }
+
+        function displayTeams() {
+            const teamsDisplay = document.getElementById('teams-display');
+            teamsDisplay.innerHTML = teams.map(team => `
+                <div class="team-card">
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-info">ID: ${team.teamID} | Table: ${team.tableID}</div>
+                </div>
+            `).join('');
+        }
+
+        function clearResults() {
+            document.getElementById('results-container').style.display = 'none';
+        }
+
+        // Initialize
+        window.onload = function() {
+            displayTeams();
+        };
+    </script>
+</body>
+</html>
