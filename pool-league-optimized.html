@@ -255,58 +255,49 @@
             return optimizedSchedule;
         }
 
-        /**
-         * Generate round-robin rounds using circle method
-         */
-        function generateRoundRobinRounds(teams, rounds, startWeek) {
-            const n = teams.length;
-            const schedule = [];
-            
-            // Create team array with indices
-            const teamArray = [...teams];
-            
-            for (let round = 0; round < rounds; round++) {
-                const weekMatches = [];
-                
-                // Generate matches for this round
-                for (let i = 0; i < n / 2; i++) {
-                    let home, away;
-                    
-                    if (i === 0) {
-                        // First match: team 0 vs rotating team
-                        home = 0;
-                        away = (rounds - round) % rounds + 1;
-                        if (away >= n) away = 1;
-                    } else {
-                        // Other matches: calculated positions
-                        home = (round + i) % rounds + 1;
-                        away = (round - i + rounds) % rounds + 1;
-                        
-                        if (home >= n) home = 0;
-                        if (away >= n) away = 0;
-                        if (home === away) continue;
-                    }
-                    
-                    // Alternate home/away to balance
-                    if (round % 2 === 1 && i % 2 === 1) {
-                        [home, away] = [away, home];
-                    }
-                    
-                    weekMatches.push({
-                        homeTeam: teamArray[home],
-                        awayTeam: teamArray[away],
-                        id: `${teamArray[home].teamID}-${teamArray[away].teamID}`
-                    });
-                }
-                
-                schedule.push({
-                    week: startWeek + round,
-                    matches: weekMatches
-                });
-            }
-            
-            return schedule;
-        }
+                 /**
+          * Generate round-robin rounds using circle method
+          */
+         function generateRoundRobinRounds(teams, rounds, startWeek) {
+             const n = teams.length;
+             const schedule = [];
+             
+             // Simple round-robin for n teams
+             for (let round = 0; round < rounds; round++) {
+                 const weekMatches = [];
+                 
+                 // Generate matches for this round using standard round-robin
+                 for (let i = 0; i < n / 2; i++) {
+                     let home = (round + i) % (n - 1);
+                     let away = (n - 1 - i + round) % (n - 1);
+                     
+                     // Handle the fixed team (last team stays in place)
+                     if (i === 0) {
+                         away = n - 1;
+                     }
+                     
+                     // Make sure we don't have duplicate indices
+                     if (home >= n - 1) home = n - 1;
+                     if (away >= n - 1) away = n - 1;
+                     
+                     // Skip if same team
+                     if (home === away) continue;
+                     
+                     weekMatches.push({
+                         homeTeam: teams[home],
+                         awayTeam: teams[away],
+                         id: `${teams[home].teamID}-${teams[away].teamID}`
+                     });
+                 }
+                 
+                 schedule.push({
+                     week: startWeek + round,
+                     matches: weekMatches
+                 });
+             }
+             
+             return schedule;
+         }
 
         /**
          * Generate return fixtures (swap home/away)
@@ -456,6 +447,12 @@
             setTimeout(() => {
                 try {
                     const schedule = generateOptimizedSchedule();
+                    console.log('Generated schedule:', schedule); // Debug log
+                    
+                    if (!schedule || !Array.isArray(schedule)) {
+                        throw new Error('Invalid schedule generated');
+                    }
+                    
                     const validation = validateSchedule(schedule, teams);
                     
                     displayValidationResults(validation);
