@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool League Fixture Scheduler</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .teams-display {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .schedule-output {
+            margin-top: 20px;
+        }
+        .week {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .week-header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+        .fixtures {
+            padding: 10px;
+        }
+        .fixture {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+        .home-team {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .away-team {
+            color: #666;
+        }
+        .vs {
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .table-info {
+            font-size: 12px;
+            color: #666;
+        }
+        .statistics {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pool League Fixture Scheduler</h1>
+        
+        <div class="teams-display">
+            <h3>Teams Configuration</h3>
+            <div id="teams-list"></div>
+        </div>
+
+        <button onclick="generateSchedule()">Generate Schedule</button>
+        <button onclick="validateSchedule()">Validate Schedule</button>
+        
+        <div id="results"></div>
+        <div id="schedule-output" class="schedule-output"></div>
+    </div>
+
+    <script>
+        // Sample teams data
+        const teams = [
+            { teamID: 9, name: "BFTC", tableID: 1 },
+            { teamID: 16, name: "Pin Ups", tableID: 1 },
+            { teamID: 1, name: "Black Sheep", tableID: 2 },
+            { teamID: 17, name: "Misfits", tableID: 2 },
+            { teamID: 7, name: "Red Lion A", tableID: 6 },
+            { teamID: 21, name: "Red Lion B", tableID: 6 },
+            { teamID: 19, name: "Riff Raff", tableID: 5 },
+            { teamID: 2, name: "Pussy", tableID: 7 },
+            { teamID: 20, name: "3 Gees", tableID: 8 },
+            { teamID: 18, name: "Gizmos", tableID: 8 }
+        ];
+
+        let generatedSchedule = [];
+
+        /**
+         * Groups teams by their table ID
+         * @param {Array} teams - Array of team objects
+         * @returns {Object} Object with tableID as keys and arrays of teams as values
+         */
+        function groupTeamsByTable(teams) {
+            return teams.reduce((groups, team) => {
+                if (!groups[team.tableID]) {
+                    groups[team.tableID] = [];
+                }
+                groups[team.tableID].push(team);
+                return groups;
+            }, {});
+        }
+
+        /**
+         * Generates all possible fixtures (home and away for each pair)
+         * @param {Array} teams - Array of team objects
+         * @returns {Array} Array of fixture objects
+         */
+        function generateAllFixtures(teams) {
+            const fixtures = [];
+            for (let i = 0; i < teams.length; i++) {
+                for (let j = 0; j < teams.length; j++) {
+                    if (i !== j) {
+                        fixtures.push({
+                            home: teams[i],
+                            away: teams[j],
+                            id: `${teams[i].teamID}-${teams[j].teamID}`
+                        });
+                    }
+                }
+            }
+            return fixtures;
+        }
+
+        /**
+         * Checks if teams sharing a table can both be at home in the same week
+         * @param {Array} weekFixtures - Fixtures for a specific week
+         * @param {Object} tableGroups - Teams grouped by table
+         * @returns {boolean} True if valid, false if conflict
+         */
+        function isValidWeek(weekFixtures, tableGroups) {
+            const homeTeamsByTable = {};
+            
+            // Group home teams by table for this week
+            weekFixtures.forEach(fixture => {
+                const tableID = fixture.home.tableID;
+                if (!homeTeamsByTable[tableID]) {
+                    homeTeamsByTable[tableID] = [];
+                }
+                homeTeamsByTable[tableID].push(fixture.home);
+            });
+
+            // Check if any table has more than one home team
+            for (const tableID in homeTeamsByTable) {
+                if (homeTeamsByTable[tableID].length > 1) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        /**
+         * Generates a fixture schedule using a constraint-based approach
+         * @param {Array} teams - Array of team objects
+         * @returns {Array} Array of weeks, each containing fixtures
+         */
+        function generateFixtureSchedule(teams) {
+            const tableGroups = groupTeamsByTable(teams);
+            const allFixtures = generateAllFixtures(teams);
+            const schedule = [];
+            const usedFixtures = new Set();
+            
+            // Calculate minimum number of weeks needed
+            const totalFixtures = teams.length * (teams.length - 1);
+            const maxFixturesPerWeek = teams.length / 2; // Assuming even number of teams
+            const minWeeks = Math.ceil(totalFixtures / maxFixturesPerWeek);
+            
+            console.log(`Total fixtures needed: ${totalFixtures}`);
+            console.log(`Maximum fixtures per week: ${maxFixturesPerWeek}`);
+            console.log(`Minimum weeks needed: ${minWeeks}`);
+
+            let attempts = 0;
+            const maxAttempts = 1000;
+
+            while (usedFixtures.size < allFixtures.length && attempts < maxAttempts) {
+                attempts++;
+                const weekFixtures = [];
+                const availableFixtures = allFixtures.filter(fixture => 
+                    !usedFixtures.has(fixture.id)
+                );
+
+                // Try to add fixtures to this week while respecting table constraints
+                const teamsPlayedThisWeek = new Set();
+                
+                for (const fixture of availableFixtures) {
+                    // Check if either team is already playing this week
+                    if (teamsPlayedThisWeek.has(fixture.home.teamID) || 
+                        teamsPlayedThisWeek.has(fixture.away.teamID)) {
+                        continue;
+                    }
+
+                    // Create a test week with this fixture added
+                    const testWeek = [...weekFixtures, fixture];
+                    
+                    // Check if this week would be valid (no table conflicts)
+                    if (isValidWeek(testWeek, tableGroups)) {
+                        weekFixtures.push(fixture);
+                        teamsPlayedThisWeek.add(fixture.home.teamID);
+                        teamsPlayedThisWeek.add(fixture.away.teamID);
+                        usedFixtures.add(fixture.id);
+                    }
+                }
+
+                if (weekFixtures.length > 0) {
+                    schedule.push({
+                        week: schedule.length + 1,
+                        fixtures: weekFixtures
+                    });
+                }
+
+                // Safety check to prevent infinite loops
+                if (weekFixtures.length === 0) {
+                    console.warn("No valid fixtures could be added to this week");
+                    break;
+                }
+            }
+
+            // Check if all fixtures were scheduled
+            if (usedFixtures.size < allFixtures.length) {
+                console.warn(`Only scheduled ${usedFixtures.size} out of ${allFixtures.length} fixtures`);
+                
+                // Try to add remaining fixtures in additional weeks
+                const remainingFixtures = allFixtures.filter(fixture => 
+                    !usedFixtures.has(fixture.id)
+                );
+                
+                console.log(`Remaining fixtures: ${remainingFixtures.length}`);
+                
+                // Add remaining fixtures week by week, even if they create conflicts
+                while (remainingFixtures.length > 0) {
+                    const weekFixtures = [];
+                    const teamsPlayedThisWeek = new Set();
+                    
+                    for (let i = remainingFixtures.length - 1; i >= 0; i--) {
+                        const fixture = remainingFixtures[i];
+                        if (!teamsPlayedThisWeek.has(fixture.home.teamID) && 
+                            !teamsPlayedThisWeek.has(fixture.away.teamID)) {
+                            weekFixtures.push(fixture);
+                            teamsPlayedThisWeek.add(fixture.home.teamID);
+                            teamsPlayedThisWeek.add(fixture.away.teamID);
+                            remainingFixtures.splice(i, 1);
+                        }
+                    }
+                    
+                    if (weekFixtures.length > 0) {
+                        schedule.push({
+                            week: schedule.length + 1,
+                            fixtures: weekFixtures
+                        });
+                    } else {
+                        break; // Prevent infinite loop
+                    }
+                }
+            }
+
+            return schedule;
+        }
+
+        /**
+         * Validates a complete schedule against all constraints
+         * @param {Array} schedule - Array of weeks with fixtures
+         * @param {Array} teams - Array of team objects
+         * @returns {Object} Validation result with details
+         */
+        function validateCompleteSchedule(schedule, teams) {
+            const validation = {
+                isValid: true,
+                errors: [],
+                warnings: [],
+                statistics: {}
+            };
+
+            const tableGroups = groupTeamsByTable(teams);
+            const fixtureCount = {};
+            
+            // Initialize fixture count for all possible pairings
+            teams.forEach(homeTeam => {
+                teams.forEach(awayTeam => {
+                    if (homeTeam.teamID !== awayTeam.teamID) {
+                        const key = `${homeTeam.teamID}-${awayTeam.teamID}`;
+                        fixtureCount[key] = 0;
+                    }
+                });
+            });
+
+            // Count fixtures and validate weekly constraints
+            schedule.forEach((week, weekIndex) => {
+                // Check table constraints for this week
+                const homeTeamsByTable = {};
+                week.fixtures.forEach(fixture => {
+                    const tableID = fixture.home.tableID;
+                    if (!homeTeamsByTable[tableID]) {
+                        homeTeamsByTable[tableID] = [];
+                    }
+                    homeTeamsByTable[tableID].push(fixture.home);
+
+                    // Count this fixture
+                    const key = `${fixture.home.teamID}-${fixture.away.teamID}`;
+                    fixtureCount[key]++;
+                });
+
+                // Check for table conflicts
+                for (const tableID in homeTeamsByTable) {
+                    if (homeTeamsByTable[tableID].length > 1) {
+                        validation.isValid = false;
+                        validation.errors.push(
+                            `Week ${week.week}: Multiple teams from table ${tableID} playing at home: ${homeTeamsByTable[tableID].map(t => t.name).join(', ')}`
+                        );
+                    }
+                }
+            });
+
+            // Check if all fixtures are scheduled exactly twice
+            for (const key in fixtureCount) {
+                if (fixtureCount[key] !== 1) {
+                    validation.isValid = false;
+                    if (fixtureCount[key] === 0) {
+                        validation.errors.push(`Missing fixture: ${key}`);
+                    } else {
+                        validation.errors.push(`Fixture ${key} scheduled ${fixtureCount[key]} times instead of 1`);
+                    }
+                }
+            }
+
+            // Calculate statistics
+            validation.statistics = {
+                totalWeeks: schedule.length,
+                totalFixtures: schedule.reduce((sum, week) => sum + week.fixtures.length, 0),
+                expectedFixtures: teams.length * (teams.length - 1),
+                averageFixturesPerWeek: schedule.length > 0 ? 
+                    (schedule.reduce((sum, week) => sum + week.fixtures.length, 0) / schedule.length).toFixed(1) : 0
+            };
+
+            return validation;
+        }
+
+        /**
+         * Displays the teams information
+         */
+        function displayTeams() {
+            const tableGroups = groupTeamsByTable(teams);
+            let html = '<h4>Teams by Table:</h4>';
+            
+            for (const tableID in tableGroups) {
+                html += `<div><strong>Table ${tableID}:</strong> `;
+                html += tableGroups[tableID].map(team => team.name).join(', ');
+                html += ` (${tableGroups[tableID].length} teams)</div>`;
+            }
+            
+            document.getElementById('teams-list').innerHTML = html;
+        }
+
+        /**
+         * Generates and displays the schedule
+         */
+        function generateSchedule() {
+            const startTime = Date.now();
+            generatedSchedule = generateFixtureSchedule(teams);
+            const endTime = Date.now();
+            
+            displaySchedule(generatedSchedule);
+            
+            document.getElementById('results').innerHTML = `
+                <div class="success">
+                    Schedule generated in ${endTime - startTime}ms
+                    <br>Generated ${generatedSchedule.length} weeks with ${generatedSchedule.reduce((sum, week) => sum + week.fixtures.length, 0)} total fixtures
+                </div>
+            `;
+        }
+
+        /**
+         * Validates the current schedule
+         */
+        function validateSchedule() {
+            if (generatedSchedule.length === 0) {
+                document.getElementById('results').innerHTML = '<div class="error">No schedule to validate. Generate a schedule first.</div>';
+                return;
+            }
+
+            const validation = validateCompleteSchedule(generatedSchedule, teams);
+            
+            let html = validation.isValid ? 
+                '<div class="success">✓ Schedule is valid!</div>' : 
+                '<div class="error">✗ Schedule has errors:</div>';
+
+            if (validation.errors.length > 0) {
+                html += '<ul>';
+                validation.errors.forEach(error => {
+                    html += `<li class="error">${error}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            if (validation.warnings.length > 0) {
+                html += '<h4>Warnings:</h4><ul>';
+                validation.warnings.forEach(warning => {
+                    html += `<li style="color: orange;">${warning}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            html += '<div class="statistics">';
+            html += '<h4>Statistics:</h4>';
+            html += `<p>Total weeks: ${validation.statistics.totalWeeks}</p>`;
+            html += `<p>Total fixtures: ${validation.statistics.totalFixtures}</p>`;
+            html += `<p>Expected fixtures: ${validation.statistics.expectedFixtures}</p>`;
+            html += `<p>Average fixtures per week: ${validation.statistics.averageFixturesPerWeek}</p>`;
+            html += '</div>';
+
+            document.getElementById('results').innerHTML = html;
+        }
+
+        /**
+         * Displays the schedule in HTML format
+         */
+        function displaySchedule(schedule) {
+            let html = '';
+            
+            schedule.forEach(week => {
+                html += `<div class="week">`;
+                html += `<div class="week-header">Week ${week.week} (${week.fixtures.length} fixtures)</div>`;
+                html += `<div class="fixtures">`;
+                
+                week.fixtures.forEach(fixture => {
+                    html += `<div class="fixture">`;
+                    html += `<span class="home-team">${fixture.home.name}</span>`;
+                    html += `<span class="table-info">(Table ${fixture.home.tableID})</span>`;
+                    html += `<span class="vs">vs</span>`;
+                    html += `<span class="away-team">${fixture.away.name}</span>`;
+                    html += `<span class="table-info">(Table ${fixture.away.tableID})</span>`;
+                    html += `</div>`;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            document.getElementById('schedule-output').innerHTML = html;
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            displayTeams();
+        });
+    </script>
+</body>
+</html>
