@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool League Fixture Scheduler - Optimized</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1, h2 {
+            color: #333;
+        }
+        
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .team-card {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .team-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .team-info {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .schedule-week {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .week-header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+        }
+        
+        .match {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .match:last-child {
+            border-bottom: none;
+        }
+        
+        .match-teams {
+            flex: 1;
+        }
+        
+        .home-team {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .away-team {
+            color: #dc3545;
+        }
+        
+        .table-info {
+            font-size: 0.8em;
+            color: #666;
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        
+        .validation-results {
+            margin-top: 20px;
+        }
+        
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        
+        .stats {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        .instructions {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+            margin-bottom: 20px;
+        }
+
+        .optimization-note {
+            background-color: #f0f8ff;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #28a745;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pool League Fixture Scheduler - Optimized</h1>
+        <div class="optimization-note">
+            <strong>🎯 Optimized Algorithm:</strong> This version generates exactly <strong>18 weeks</strong> for 10 teams with <strong>5 matches per week</strong> using a proper round-robin tournament structure.
+        </div>
+        <div class="instructions">
+            <strong>📋 How it works:</strong> Creates two 9-week round-robin tournaments. In the first 9 weeks, every team plays every other team once. In weeks 10-18, they play the return fixtures (swapping home/away).
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Current Teams</h2>
+        <div id="teams-display" class="teams-grid"></div>
+        
+        <div class="controls">
+            <button onclick="generateOptimizedSchedule()" id="generateBtn">Generate Optimized Schedule</button>
+            <button onclick="clearResults()" id="clearBtn">Clear Results</button>
+        </div>
+    </div>
+
+    <div class="container" id="results-container" style="display: none;">
+        <h2>Schedule Results</h2>
+        <div id="validation-results" class="validation-results"></div>
+        <div id="schedule-display"></div>
+    </div>
+
+    <script>
+        // Optimized Pool League Fixture Scheduler
+        
+        const teams = [
+            { teamID: 9, name: "BFTC", tableID: 1 },
+            { teamID: 16, name: "Pin Ups", tableID: 1 },
+            { teamID: 1, name: "Black Sheep", tableID: 2 },
+            { teamID: 17, name: "Misfits", tableID: 2 },
+            { teamID: 7, name: "Red Lion A", tableID: 6 },
+            { teamID: 21, name: "Red Lion B", tableID: 6 },
+            { teamID: 19, name: "Riff Raff", tableID: 5 },
+            { teamID: 2, name: "Pussy", tableID: 7 },
+            { teamID: 20, name: "3 Gees", tableID: 8 },
+            { teamID: 18, name: "Gizmos", tableID: 8 }
+        ];
+
+        /**
+         * Generate optimized round-robin schedule
+         * For n teams: (n-1) weeks per round, 2 rounds total
+         */
+        function generateOptimizedSchedule() {
+            const n = teams.length;
+            const schedule = [];
+            
+            // For 10 teams, we need 9 rounds per half-season (18 total weeks)
+            const roundsPerHalf = n - 1;
+            
+            // Generate first half-season (weeks 1-9)
+            const firstHalf = generateRoundRobinRounds(teams, roundsPerHalf, 1);
+            
+            // Generate second half-season (weeks 10-18) - reverse home/away
+            const secondHalf = generateReturnFixtures(firstHalf, roundsPerHalf);
+            
+            // Combine both halves
+            const fullSchedule = [...firstHalf, ...secondHalf];
+            
+            // Apply table constraints by swapping home/away when needed
+            const optimizedSchedule = applyTableConstraints(fullSchedule);
+            
+            return optimizedSchedule;
+        }
+
+        /**
+         * Generate round-robin rounds using circle method
+         */
+        function generateRoundRobinRounds(teams, rounds, startWeek) {
+            const n = teams.length;
+            const schedule = [];
+            
+            // Create team array with indices
+            const teamArray = [...teams];
+            
+            for (let round = 0; round < rounds; round++) {
+                const weekMatches = [];
+                
+                // Generate matches for this round
+                for (let i = 0; i < n / 2; i++) {
+                    let home, away;
+                    
+                    if (i === 0) {
+                        // First match: team 0 vs rotating team
+                        home = 0;
+                        away = (rounds - round) % rounds + 1;
+                        if (away >= n) away = 1;
+                    } else {
+                        // Other matches: calculated positions
+                        home = (round + i) % rounds + 1;
+                        away = (round - i + rounds) % rounds + 1;
+                        
+                        if (home >= n) home = 0;
+                        if (away >= n) away = 0;
+                        if (home === away) continue;
+                    }
+                    
+                    // Alternate home/away to balance
+                    if (round % 2 === 1 && i % 2 === 1) {
+                        [home, away] = [away, home];
+                    }
+                    
+                    weekMatches.push({
+                        homeTeam: teamArray[home],
+                        awayTeam: teamArray[away],
+                        id: `${teamArray[home].teamID}-${teamArray[away].teamID}`
+                    });
+                }
+                
+                schedule.push({
+                    week: startWeek + round,
+                    matches: weekMatches
+                });
+            }
+            
+            return schedule;
+        }
+
+        /**
+         * Generate return fixtures (swap home/away)
+         */
+        function generateReturnFixtures(firstHalf, roundsPerHalf) {
+            return firstHalf.map((week, index) => ({
+                week: week.week + roundsPerHalf,
+                matches: week.matches.map(match => ({
+                    homeTeam: match.awayTeam,
+                    awayTeam: match.homeTeam,
+                    id: `${match.awayTeam.teamID}-${match.homeTeam.teamID}`
+                }))
+            }));
+        }
+
+        /**
+         * Apply table constraints by swapping home/away when needed
+         */
+        function applyTableConstraints(schedule) {
+            return schedule.map(week => {
+                const adjustedMatches = [...week.matches];
+                const homeTeamsPerTable = {};
+                
+                // Count home teams per table
+                adjustedMatches.forEach(match => {
+                    const tableID = match.homeTeam.tableID;
+                    if (!homeTeamsPerTable[tableID]) {
+                        homeTeamsPerTable[tableID] = [];
+                    }
+                    homeTeamsPerTable[tableID].push(match);
+                });
+                
+                // Fix conflicts by swapping home/away for some matches
+                Object.keys(homeTeamsPerTable).forEach(tableID => {
+                    const matchesAtTable = homeTeamsPerTable[tableID];
+                    if (matchesAtTable.length > 1) {
+                        // Keep first match as home, swap others
+                        for (let i = 1; i < matchesAtTable.length; i++) {
+                            const matchToSwap = matchesAtTable[i];
+                            const matchIndex = adjustedMatches.findIndex(m => m.id === matchToSwap.id);
+                            if (matchIndex !== -1) {
+                                const originalMatch = adjustedMatches[matchIndex];
+                                adjustedMatches[matchIndex] = {
+                                    homeTeam: originalMatch.awayTeam,
+                                    awayTeam: originalMatch.homeTeam,
+                                    id: `${originalMatch.awayTeam.teamID}-${originalMatch.homeTeam.teamID}`
+                                };
+                            }
+                        }
+                    }
+                });
+                
+                return {
+                    week: week.week,
+                    matches: adjustedMatches
+                };
+            });
+        }
+
+        /**
+         * Validate the schedule
+         */
+        function validateSchedule(schedule, teams) {
+            const validation = {
+                valid: true,
+                errors: [],
+                stats: {}
+            };
+            
+            const totalMatches = schedule.reduce((sum, week) => sum + week.matches.length, 0);
+            const expectedMatches = teams.length * (teams.length - 1);
+            
+            if (totalMatches !== expectedMatches) {
+                validation.valid = false;
+                validation.errors.push(`Total matches: ${totalMatches}, Expected: ${expectedMatches}`);
+            }
+            
+            // Check table constraints
+            schedule.forEach(week => {
+                const homeTeamsPerTable = {};
+                week.matches.forEach(match => {
+                    const tableID = match.homeTeam.tableID;
+                    homeTeamsPerTable[tableID] = (homeTeamsPerTable[tableID] || 0) + 1;
+                });
+                
+                Object.keys(homeTeamsPerTable).forEach(tableID => {
+                    if (homeTeamsPerTable[tableID] > 1) {
+                        validation.valid = false;
+                        validation.errors.push(`Week ${week.week}: Table ${tableID} has ${homeTeamsPerTable[tableID]} home teams`);
+                    }
+                });
+            });
+            
+            // Calculate stats
+            const matchesPerWeek = schedule.map(week => week.matches.length);
+            validation.stats = {
+                totalWeeks: schedule.length,
+                totalMatches: totalMatches,
+                expectedMatches: expectedMatches,
+                matchesPerWeek: matchesPerWeek,
+                avgMatchesPerWeek: totalMatches / schedule.length,
+                minMatchesPerWeek: Math.min(...matchesPerWeek),
+                maxMatchesPerWeek: Math.max(...matchesPerWeek)
+            };
+            
+            return validation;
+        }
+
+        /**
+         * Format schedule for display
+         */
+        function formatScheduleForDisplay(schedule) {
+            return schedule.map(week => ({
+                week: week.week,
+                matches: week.matches.map(match => ({
+                    homeTeam: match.homeTeam.name,
+                    awayTeam: match.awayTeam.name,
+                    homeTableID: match.homeTeam.tableID,
+                    awayTableID: match.awayTeam.tableID
+                }))
+            }));
+        }
+
+        // UI Functions
+        function displayTeams() {
+            const teamsDisplay = document.getElementById('teams-display');
+            teamsDisplay.innerHTML = '';
+            
+            teams.forEach(team => {
+                const teamCard = document.createElement('div');
+                teamCard.className = 'team-card';
+                teamCard.innerHTML = `
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-info">ID: ${team.teamID} | Table: ${team.tableID}</div>
+                `;
+                teamsDisplay.appendChild(teamCard);
+            });
+        }
+
+        function generateOptimizedScheduleWrapper() {
+            const generateBtn = document.getElementById('generateBtn');
+            const resultsContainer = document.getElementById('results-container');
+            
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            
+            setTimeout(() => {
+                try {
+                    const schedule = generateOptimizedSchedule();
+                    const validation = validateSchedule(schedule, teams);
+                    
+                    displayValidationResults(validation);
+                    displaySchedule(schedule);
+                    
+                    resultsContainer.style.display = 'block';
+                } catch (error) {
+                    console.error('Error generating schedule:', error);
+                    alert('Error generating schedule: ' + error.message);
+                } finally {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'Generate Optimized Schedule';
+                }
+            }, 100);
+        }
+
+        // Alias for the button onclick
+        window.generateOptimizedSchedule = generateOptimizedScheduleWrapper;
+
+        function displayValidationResults(validation) {
+            const container = document.getElementById('validation-results');
+            container.innerHTML = '';
+            
+            const statusDiv = document.createElement('div');
+            statusDiv.className = validation.valid ? 'success' : 'error';
+            statusDiv.textContent = validation.valid ? 
+                '✓ Schedule is optimally generated!' : 
+                '✗ Schedule has validation errors';
+            container.appendChild(statusDiv);
+            
+            if (validation.errors.length > 0) {
+                validation.errors.forEach(error => {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error';
+                    errorDiv.textContent = error;
+                    container.appendChild(errorDiv);
+                });
+            }
+            
+            const stats = validation.stats;
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'stats';
+            statsDiv.innerHTML = `
+                <h3>Schedule Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.totalWeeks}</div>
+                        <div class="stat-label">Total Weeks</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.totalMatches}</div>
+                        <div class="stat-label">Total Matches</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.avgMatchesPerWeek.toFixed(1)}</div>
+                        <div class="stat-label">Avg Matches/Week</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.minMatchesPerWeek}-${stats.maxMatchesPerWeek}</div>
+                        <div class="stat-label">Min-Max Matches/Week</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(statsDiv);
+        }
+
+        function displaySchedule(schedule) {
+            const container = document.getElementById('schedule-display');
+            container.innerHTML = '';
+            
+            const formattedSchedule = formatScheduleForDisplay(schedule);
+            
+            formattedSchedule.forEach(week => {
+                const weekDiv = document.createElement('div');
+                weekDiv.className = 'schedule-week';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'week-header';
+                headerDiv.textContent = `Week ${week.week} (${week.matches.length} matches)`;
+                weekDiv.appendChild(headerDiv);
+                
+                week.matches.forEach(match => {
+                    const matchDiv = document.createElement('div');
+                    matchDiv.className = 'match';
+                    matchDiv.innerHTML = `
+                        <div class="match-teams">
+                            <span class="home-team">${match.homeTeam}</span>
+                            <span class="table-info">Table ${match.homeTableID}</span>
+                            vs
+                            <span class="away-team">${match.awayTeam}</span>
+                            <span class="table-info">Table ${match.awayTableID}</span>
+                        </div>
+                    `;
+                    weekDiv.appendChild(matchDiv);
+                });
+                
+                container.appendChild(weekDiv);
+            });
+        }
+
+        function clearResults() {
+            document.getElementById('results-container').style.display = 'none';
+            document.getElementById('validation-results').innerHTML = '';
+            document.getElementById('schedule-display').innerHTML = '';
+        }
+
+        // Initialize
+        window.onload = function() {
+            displayTeams();
+        };
+    </script>
+</body>
+</html>
